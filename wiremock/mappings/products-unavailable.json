@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/products/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  },
+  "response": {
+    "status": 422,
+    "headers": { "Content-Type": "application/problem+json" },
+    "jsonBody": {
+      "type": "https://api.ecommerce.dev/problems/product-unavailable",
+      "title": "Product unavailable",
+      "status": 422,
+      "detail": "Product bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb is currently unavailable"
+    }
+  }
+}

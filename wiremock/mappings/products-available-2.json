@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/products/cccccccc-cccc-cccc-cccc-cccccccccccc"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "Mouse Sem Fio",
+      "available": true,
+      "price": { "amount": 49.90, "currency": "BRL" }
+    }
+  }
+}

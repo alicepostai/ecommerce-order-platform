@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/payments",
+    "bodyPatterns": [
+      { "matchesJsonPath": "$[?(@.method.cardToken == 'tok-rejected')]" }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "body": "{\"transactionId\":\"tx-0002\",\"status\":\"REJECTED\",\"reason\":\"insufficient_funds\",\"paymentId\":\"{{jsonPath request.body '$.paymentId'}}\"}"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "Teclado Mecânico TKL",
+      "available": true,
+      "price": { "amount": 199.90, "currency": "BRL" }
+    }
+  }
+}

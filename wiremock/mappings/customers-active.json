@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/customers/11111111-1111-1111-1111-111111111111"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Alice Souza",
+      "email": "alice@example.com",
+      "status": "ACTIVE"
+    }
+  }
+}

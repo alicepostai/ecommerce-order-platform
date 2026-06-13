@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/products/.*"
+  },
+  "response": {
+    "status": 404,
+    "headers": { "Content-Type": "application/problem+json" },
+    "jsonBody": {
+      "type": "https://api.ecommerce.dev/problems/product-not-found",
+      "title": "Product not found",
+      "status": 404
+    }
+  },
+  "priority": 10
+}

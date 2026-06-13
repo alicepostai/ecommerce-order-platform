@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/payments",
+    "bodyPatterns": [
+      { "matchesJsonPath": "$[?(@.method.cardToken == 'tok-approved')]" }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "body": "{\"transactionId\":\"tx-0001\",\"status\":\"APPROVED\",\"paymentId\":\"{{jsonPath request.body '$.paymentId'}}\"}"
+  }
+}

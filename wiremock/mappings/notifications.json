@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/notifications"
+  },
+  "response": {
+    "status": 202,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "notificationId": "ntf-0001",
+      "status": "ACCEPTED"
+    }
+  }
+}

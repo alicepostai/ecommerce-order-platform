@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/customers/22222222-2222-2222-2222-222222222222"
+  },
+  "response": {
+    "status": 422,
+    "headers": { "Content-Type": "application/problem+json" },
+    "jsonBody": {
+      "type": "https://api.ecommerce.dev/problems/customer-blocked",
+      "title": "Customer blocked",
+      "status": 422,
+      "detail": "Customer 22222222-2222-2222-2222-222222222222 is blocked"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/payments",
+    "bodyPatterns": [
+      { "matchesJsonPath": "$[?(@.method.cardToken == 'tok-unstable')]" }
+    ]
+  },
+  "response": {
+    "status": 503,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "error": "gateway_unavailable" },
+    "fixedDelayMilliseconds": 1500
+  }
+}
