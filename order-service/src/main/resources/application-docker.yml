@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/orders
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://wiremock:8080/auth/.well-known/jwks.json
+
+external:
+  customer:
+    base-url: http://wiremock:8080
+  catalog:
+    base-url: http://wiremock:8080
+  payment-gateway:
+    base-url: http://wiremock:8080
+  notification:
+    base-url: http://wiremock:8080
+
+management:
+  otlp:
+    tracing:
+      endpoint: http://jaeger:4318/v1/traces
