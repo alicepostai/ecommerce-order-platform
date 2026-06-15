@@ -9,6 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.*;
 
 @DisplayName("Payment aggregate")
@@ -16,7 +18,7 @@ class PaymentTest {
 
     private static final PaymentId PAYMENT_ID = PaymentId.generate();
     private static final OrderId ORDER_ID = OrderId.generate();
-    private static final String CARD_TOKEN = "tok-approved";
+    private static final Money AMOUNT = new Money(new BigDecimal("199.90"), "BRL");
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
@@ -27,11 +29,11 @@ class PaymentTest {
         @Test
         @DisplayName("cria pagamento PENDING com attemptNumber=1 e dispara PaymentCreated")
         void createsPendingPaymentWithAttemptOne() {
-            var payment = Payment.create(PAYMENT_ID, ORDER_ID, CARD_TOKEN, 1);
+            var payment = Payment.create(PAYMENT_ID, ORDER_ID, AMOUNT, 1);
 
             assertThat(payment.getId()).isEqualTo(PAYMENT_ID);
             assertThat(payment.getOrderId()).isEqualTo(ORDER_ID);
-            assertThat(payment.getCardToken()).isEqualTo(CARD_TOKEN);
+            assertThat(payment.getAmount()).isEqualTo(AMOUNT);
             assertThat(payment.getAttemptNumber()).isEqualTo(1);
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
 
@@ -48,32 +50,30 @@ class PaymentTest {
         @DisplayName("lanca excecao quando id e nulo")
         void throwsOnNullId() {
             assertThatNullPointerException()
-                    .isThrownBy(() -> Payment.create(null, ORDER_ID, CARD_TOKEN, 1));
+                    .isThrownBy(() -> Payment.create(null, ORDER_ID, AMOUNT, 1));
         }
 
         @Test
         @DisplayName("lanca excecao quando orderId e nulo")
         void throwsOnNullOrderId() {
             assertThatNullPointerException()
-                    .isThrownBy(() -> Payment.create(PAYMENT_ID, null, CARD_TOKEN, 1));
+                    .isThrownBy(() -> Payment.create(PAYMENT_ID, null, AMOUNT, 1));
         }
 
         @Test
-        @DisplayName("lanca excecao quando cardToken e nulo ou vazio")
-        void throwsOnBlankCardToken() {
-            assertThatIllegalArgumentException()
+        @DisplayName("lanca excecao quando amount e nulo")
+        void throwsOnNullAmount() {
+            assertThatNullPointerException()
                     .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, null, 1));
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, "  ", 1));
         }
 
         @Test
         @DisplayName("lanca excecao quando attemptNumber < 1")
         void throwsOnInvalidAttemptNumber() {
             assertThatIllegalArgumentException()
-                    .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, CARD_TOKEN, 0));
+                    .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, AMOUNT, 0));
             assertThatIllegalArgumentException()
-                    .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, CARD_TOKEN, -1));
+                    .isThrownBy(() -> Payment.create(PAYMENT_ID, ORDER_ID, AMOUNT, -1));
         }
     }
 
@@ -84,13 +84,14 @@ class PaymentTest {
     class Approve {
 
         @Test
-        @DisplayName("PENDING → APPROVED dispara PaymentApproved")
+        @DisplayName("PENDING → APPROVED dispara PaymentApproved e armazena transactionId")
         void pendingToApproved() {
             var payment = pendingPayment();
 
-            payment.approve();
+            payment.approve("tx-0001");
 
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+            assertThat(payment.getTransactionId()).isEqualTo("tx-0001");
             var events = payment.pullDomainEvents();
             assertThat(events).hasSize(1);
             assertThat(events.get(0)).isInstanceOf(PaymentApproved.class);
@@ -100,12 +101,13 @@ class PaymentTest {
         @DisplayName("APPROVED → APPROVED e idempotente (sem excecao, sem evento extra)")
         void approvedIsIdempotent() {
             var payment = pendingPayment();
-            payment.approve();
-            payment.pullDomainEvents(); // limpa
+            payment.approve("tx-0001");
+            payment.pullDomainEvents();
 
-            payment.approve(); // segunda chamada
+            payment.approve("tx-0001-duplicate");
 
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+            assertThat(payment.getTransactionId()).isEqualTo("tx-0001"); // primeiro ganha
             assertThat(payment.pullDomainEvents()).isEmpty();
         }
 
@@ -113,10 +115,10 @@ class PaymentTest {
         @DisplayName("REJECTED → APPROVED lanca InvalidStateTransitionException")
         void rejectedCannotBeApproved() {
             var payment = pendingPayment();
-            payment.reject();
+            payment.reject("tx-0002");
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
-                    .isThrownBy(payment::approve)
+                    .isThrownBy(() -> payment.approve("tx-late"))
                     .satisfies(ex -> assertThat(ex.getErrorCode()).isEqualTo("invalid-payment-state"));
         }
 
@@ -127,7 +129,7 @@ class PaymentTest {
             payment.cancel();
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
-                    .isThrownBy(payment::approve)
+                    .isThrownBy(() -> payment.approve("tx-late"))
                     .satisfies(ex -> assertThat(ex.getErrorCode()).isEqualTo("invalid-payment-state"));
         }
     }
@@ -143,9 +145,10 @@ class PaymentTest {
         void pendingToRejected() {
             var payment = pendingPayment();
 
-            payment.reject();
+            payment.reject("tx-0002");
 
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REJECTED);
+            assertThat(payment.getTransactionId()).isEqualTo("tx-0002");
             var events = payment.pullDomainEvents();
             assertThat(events).hasSize(1);
             assertThat(events.get(0)).isInstanceOf(PaymentRejected.class);
@@ -158,10 +161,10 @@ class PaymentTest {
         @DisplayName("REJECTED → REJECTED lanca InvalidStateTransitionException")
         void rejectedIsNotIdempotent() {
             var payment = pendingPayment();
-            payment.reject();
+            payment.reject("tx-0002");
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
-                    .isThrownBy(payment::reject)
+                    .isThrownBy(() -> payment.reject("tx-0003"))
                     .satisfies(ex -> assertThat(ex.getErrorCode()).isEqualTo("invalid-payment-state"));
         }
 
@@ -169,10 +172,10 @@ class PaymentTest {
         @DisplayName("APPROVED → REJECTED lanca InvalidStateTransitionException")
         void approvedCannotBeRejected() {
             var payment = pendingPayment();
-            payment.approve();
+            payment.approve("tx-0001");
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
-                    .isThrownBy(payment::reject)
+                    .isThrownBy(() -> payment.reject("tx-0002"))
                     .satisfies(ex -> assertThat(ex.getErrorCode()).isEqualTo("invalid-payment-state"));
         }
 
@@ -183,7 +186,7 @@ class PaymentTest {
             payment.cancel();
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
-                    .isThrownBy(payment::reject);
+                    .isThrownBy(() -> payment.reject("tx-0002"));
         }
     }
 
@@ -223,7 +226,7 @@ class PaymentTest {
         @DisplayName("APPROVED → CANCELLED lanca InvalidStateTransitionException")
         void approvedCannotBeCancelled() {
             var payment = pendingPayment();
-            payment.approve();
+            payment.approve("tx-0001");
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
                     .isThrownBy(payment::cancel)
@@ -234,7 +237,7 @@ class PaymentTest {
         @DisplayName("REJECTED → CANCELLED lanca InvalidStateTransitionException")
         void rejectedCannotBeCancelled() {
             var payment = pendingPayment();
-            payment.reject();
+            payment.reject("tx-0002");
 
             assertThatExceptionOfType(InvalidStateTransitionException.class)
                     .isThrownBy(payment::cancel)
@@ -251,7 +254,7 @@ class PaymentTest {
         @Test
         @DisplayName("limpa a lista apos retornar os eventos")
         void clearsEventsAfterPull() {
-            var payment = Payment.create(PAYMENT_ID, ORDER_ID, CARD_TOKEN, 1);
+            var payment = Payment.create(PAYMENT_ID, ORDER_ID, AMOUNT, 1);
             assertThat(payment.pullDomainEvents()).hasSize(1); // PaymentCreated
             assertThat(payment.pullDomainEvents()).isEmpty();
         }
@@ -275,12 +278,14 @@ class PaymentTest {
         @Test
         @DisplayName("reconstitui pagamento sem disparar eventos")
         void reconstitutesWithoutEvents() {
-            var payment = Payment.reconstitute(PAYMENT_ID, ORDER_ID, CARD_TOKEN,
-                    PaymentStatus.APPROVED, 2);
+            var payment = Payment.reconstitute(PAYMENT_ID, ORDER_ID, AMOUNT,
+                    PaymentStatus.APPROVED, 2, "tx-0001");
 
             assertThat(payment.getId()).isEqualTo(PAYMENT_ID);
+            assertThat(payment.getAmount()).isEqualTo(AMOUNT);
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
             assertThat(payment.getAttemptNumber()).isEqualTo(2);
+            assertThat(payment.getTransactionId()).isEqualTo("tx-0001");
             assertThat(payment.pullDomainEvents()).isEmpty();
         }
     }
@@ -288,7 +293,7 @@ class PaymentTest {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Payment pendingPayment() {
-        var payment = Payment.create(PAYMENT_ID, ORDER_ID, CARD_TOKEN, 1);
+        var payment = Payment.create(PAYMENT_ID, ORDER_ID, AMOUNT, 1);
         payment.pullDomainEvents(); // limpa PaymentCreated para os testes focarem nas transicoes
         return payment;
     }

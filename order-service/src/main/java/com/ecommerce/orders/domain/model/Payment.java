@@ -11,51 +11,54 @@ public class Payment {
 
     private final PaymentId id;
     private final OrderId orderId;
-    private final String cardToken;
+    private final Money amount;
     private PaymentStatus status;
     private final int attemptNumber;
+    private String transactionId;
     private final List<DomainEvent> domainEvents;
 
-    private Payment(PaymentId id, OrderId orderId, String cardToken, PaymentStatus status, int attemptNumber) {
+    private Payment(PaymentId id, OrderId orderId, Money amount, PaymentStatus status,
+                    int attemptNumber, String transactionId) {
         this.id = id;
         this.orderId = orderId;
-        this.cardToken = cardToken;
+        this.amount = amount;
         this.status = status;
         this.attemptNumber = attemptNumber;
+        this.transactionId = transactionId;
         this.domainEvents = new ArrayList<>();
     }
 
-    public static Payment create(PaymentId id, OrderId orderId, String cardToken, int attemptNumber) {
+    public static Payment create(PaymentId id, OrderId orderId, Money amount, int attemptNumber) {
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(orderId, "orderId must not be null");
-        if (cardToken == null || cardToken.isBlank())
-            throw new IllegalArgumentException("cardToken must not be null or blank");
+        Objects.requireNonNull(amount, "amount must not be null");
         if (attemptNumber < 1)
             throw new IllegalArgumentException("attemptNumber must be >= 1");
 
-        var payment = new Payment(id, orderId, cardToken, PaymentStatus.PENDING, attemptNumber);
+        var payment = new Payment(id, orderId, amount, PaymentStatus.PENDING, attemptNumber, null);
         payment.registerEvent(new PaymentCreated(id, orderId, attemptNumber));
         return payment;
     }
 
-    /** Reconstitui um pagamento já persistido sem disparar eventos de domínio. */
-    public static Payment reconstitute(PaymentId id, OrderId orderId, String cardToken,
-                                       PaymentStatus status, int attemptNumber) {
-        return new Payment(id, orderId, cardToken, status, attemptNumber);
+    public static Payment reconstitute(PaymentId id, OrderId orderId, Money amount,
+                                       PaymentStatus status, int attemptNumber, String transactionId) {
+        return new Payment(id, orderId, amount, status, attemptNumber, transactionId);
     }
 
     // ── Comandos ─────────────────────────────────────────────────────────────
 
-    public void approve() {
+    public void approve(String transactionId) {
         if (status == PaymentStatus.APPROVED) return; // idempotente
         requireStatus(PaymentStatus.PENDING, "invalid-payment-state");
         this.status = PaymentStatus.APPROVED;
+        this.transactionId = transactionId;
         registerEvent(new PaymentApproved(id, orderId));
     }
 
-    public void reject() {
+    public void reject(String transactionId) {
         requireStatus(PaymentStatus.PENDING, "invalid-payment-state");
         this.status = PaymentStatus.REJECTED;
+        this.transactionId = transactionId;
         registerEvent(new PaymentRejected(id, orderId));
     }
 
@@ -80,9 +83,10 @@ public class Payment {
 
     public PaymentId getId() { return id; }
     public OrderId getOrderId() { return orderId; }
-    public String getCardToken() { return cardToken; }
+    public Money getAmount() { return amount; }
     public PaymentStatus getStatus() { return status; }
     public int getAttemptNumber() { return attemptNumber; }
+    public String getTransactionId() { return transactionId; }
 
     // ── Helpers privados ─────────────────────────────────────────────────────
 

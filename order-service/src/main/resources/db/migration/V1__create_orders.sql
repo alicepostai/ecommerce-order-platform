@@ -24,5 +24,9 @@ CREATE TABLE order_items (
     CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
+CREATE UNIQUE INDEX ux_orders_one_active_per_customer
+    ON orders(customer_id) WHERE status IN ('CREATED', 'CONFIRMED', 'PAYMENT_PENDING');
+
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE UNIQUE INDEX ux_order_items_product ON order_items(order_id, product_id);
