@@ -38,7 +38,6 @@ public class InitiatePaymentUseCaseImpl implements InitiatePaymentUseCase {
         // Phase 2: apply result — committed immediately
         var phase2 = txHelper.applyResult(phase1, result);
 
-        // Notifications are fire-and-forget; never fail the operation
         safeNotify(phase2.customerId(), phase2.finalOrderStatus(), phase1.orderId().value().toString());
 
         return PaymentResult.from(phase2.payment());
@@ -55,7 +54,6 @@ public class InitiatePaymentUseCaseImpl implements InitiatePaymentUseCase {
                 notificationPort.send(customerId, template, Map.of("orderId", orderId));
             }
         } catch (Exception e) {
-            // Notification failure is non-fatal
         }
     }
 }
