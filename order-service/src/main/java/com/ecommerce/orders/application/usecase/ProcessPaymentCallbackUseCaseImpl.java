@@ -7,6 +7,7 @@ import com.ecommerce.orders.domain.event.LatePaymentResultReceived;
 import com.ecommerce.orders.domain.exception.OrderNotFoundException;
 import com.ecommerce.orders.domain.exception.PaymentNotFoundException;
 import com.ecommerce.orders.domain.model.*;
+import com.ecommerce.orders.application.port.out.MetricsPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,17 +27,20 @@ public class ProcessPaymentCallbackUseCaseImpl implements ProcessPaymentCallback
     private final WebhookEventStore webhookEventStore;
     private final DomainEventPublisher eventPublisher;
     private final NotificationPort notificationPort;
+    private final MetricsPort metrics;
 
     public ProcessPaymentCallbackUseCaseImpl(PaymentRepository paymentRepository,
                                              OrderRepository orderRepository,
                                              WebhookEventStore webhookEventStore,
                                              DomainEventPublisher eventPublisher,
-                                             NotificationPort notificationPort) {
+                                             NotificationPort notificationPort,
+                                             MetricsPort metrics) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.webhookEventStore = webhookEventStore;
         this.eventPublisher = eventPublisher;
         this.notificationPort = notificationPort;
+        this.metrics = metrics;
     }
 
     @Override
@@ -72,7 +76,9 @@ public class ProcessPaymentCallbackUseCaseImpl implements ProcessPaymentCallback
         } else {
             payment.reject(command.transactionId());
             order.applyPaymentRejected();
+            metrics.incrementPaymentsRejected();
             if (order.getStatus() == OrderStatus.CANCELLED) {
+                metrics.incrementOrdersAutoCancelled();
                 safeNotify(order.getCustomerId(), NotificationPort.NotificationTemplate.ORDER_CANCELLED,
                         Map.of("orderId", order.getId().value().toString()));
             }

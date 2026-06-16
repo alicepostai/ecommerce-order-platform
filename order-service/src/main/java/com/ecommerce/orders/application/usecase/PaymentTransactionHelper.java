@@ -6,6 +6,7 @@ import com.ecommerce.orders.application.port.out.PaymentGatewayPort;
 import com.ecommerce.orders.application.port.out.PaymentRepository;
 import com.ecommerce.orders.domain.event.DomainEvent;
 import com.ecommerce.orders.domain.model.*;
+import com.ecommerce.orders.application.port.out.MetricsPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +24,16 @@ public class PaymentTransactionHelper {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final DomainEventPublisher eventPublisher;
+    private final MetricsPort metrics;
 
     public PaymentTransactionHelper(OrderRepository orderRepository,
                                     PaymentRepository paymentRepository,
-                                    DomainEventPublisher eventPublisher) {
+                                    DomainEventPublisher eventPublisher,
+                                    MetricsPort metrics) {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.eventPublisher = eventPublisher;
+        this.metrics = metrics;
     }
 
     public record Phase1Result(PaymentId paymentId, OrderId orderId, Money amount, int attemptNumber) {}
@@ -94,6 +98,14 @@ public class PaymentTransactionHelper {
         }
         if (!paymentEvents.isEmpty()) {
             eventPublisher.publishAll(paymentEvents, "Payment", phase1.paymentId().value());
+        }
+
+        // Business metrics
+        if (result.status() == PaymentGatewayPort.ChargeStatus.REJECTED) {
+            metrics.incrementPaymentsRejected();
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                metrics.incrementOrdersAutoCancelled();
+            }
         }
 
         return new Phase2Result(payment, order.getStatus(), order.getCustomerId(), orderEvents, paymentEvents);

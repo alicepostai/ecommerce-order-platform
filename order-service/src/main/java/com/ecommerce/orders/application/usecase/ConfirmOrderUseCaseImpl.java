@@ -9,8 +9,10 @@ import com.ecommerce.orders.application.port.out.OrderRepository;
 import com.ecommerce.orders.application.port.out.ProductCatalogGateway;
 import com.ecommerce.orders.domain.exception.OrderNotFoundException;
 import com.ecommerce.orders.domain.model.OrderId;
+import com.ecommerce.orders.domain.model.OrderStatus;
 import com.ecommerce.orders.domain.model.ProductId;
 import com.ecommerce.orders.domain.model.ProductSnapshot;
+import com.ecommerce.orders.application.port.out.MetricsPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +27,18 @@ public class ConfirmOrderUseCaseImpl implements ConfirmOrderUseCase {
     private final ProductCatalogGateway catalogGateway;
     private final DomainEventPublisher eventPublisher;
     private final NotificationPort notificationPort;
+    private final MetricsPort metrics;
 
     public ConfirmOrderUseCaseImpl(OrderRepository orderRepository,
                                    ProductCatalogGateway catalogGateway,
                                    DomainEventPublisher eventPublisher,
-                                   NotificationPort notificationPort) {
+                                   NotificationPort notificationPort,
+                                   MetricsPort metrics) {
         this.orderRepository = orderRepository;
         this.catalogGateway = catalogGateway;
         this.eventPublisher = eventPublisher;
         this.notificationPort = notificationPort;
+        this.metrics = metrics;
     }
 
     @Override
@@ -41,6 +46,8 @@ public class ConfirmOrderUseCaseImpl implements ConfirmOrderUseCase {
         var orderId = new OrderId(command.orderId());
         var order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.value().toString()));
+
+        var previousStatus = order.getStatus();
 
         Map<ProductId, ProductSnapshot> snapshots = new HashMap<>();
         for (var item : order.getItems()) {
@@ -57,6 +64,12 @@ public class ConfirmOrderUseCaseImpl implements ConfirmOrderUseCase {
                     order.getCustomerId(),
                     NotificationPort.NotificationTemplate.ORDER_CONFIRMED,
                     Map.of("orderId", order.getId().value().toString()));
+        }
+
+        // Count only real transitions (not idempotent re-confirms)
+        if (previousStatus == com.ecommerce.orders.domain.model.OrderStatus.CREATED
+                && order.getStatus() == OrderStatus.CONFIRMED) {
+            metrics.incrementOrdersConfirmed();
         }
 
         return OrderResult.from(order);
