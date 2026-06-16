@@ -31,6 +31,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers
+                        .contentTypeOptions(opt -> {})
+                        .cacheControl(cache -> {})
+                        .frameOptions(frame -> frame.deny())
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> {})
