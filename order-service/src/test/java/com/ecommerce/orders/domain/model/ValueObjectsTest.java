@@ -1,5 +1,6 @@
 package com.ecommerce.orders.domain.model;
 
+import com.ecommerce.orders.domain.event.LatePaymentResultReceived;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -19,6 +20,25 @@ class ValueObjectsTest {
     void order_id_of_parses_valid_uuid_string() {
         var uuid = UUID.randomUUID().toString();
         assertThat(OrderId.of(uuid).value().toString()).isEqualTo(uuid);
+    }
+
+    @Test
+    void typed_ids_of_factory_returns_non_null() {
+        var uuid = UUID.randomUUID().toString();
+        assertThat(CustomerId.of(uuid)).isNotNull();
+        assertThat(ProductId.of(uuid)).isNotNull();
+        assertThat(PaymentId.of(uuid)).isNotNull();
+        assertThat(OrderItemId.of(uuid)).isNotNull();
+    }
+
+    @Test
+    void typed_ids_to_string_returns_uuid_string() {
+        var uuid = UUID.randomUUID();
+        assertThat(new OrderId(uuid).toString()).isEqualTo(uuid.toString());
+        assertThat(new CustomerId(uuid).toString()).isEqualTo(uuid.toString());
+        assertThat(new ProductId(uuid).toString()).isEqualTo(uuid.toString());
+        assertThat(new PaymentId(uuid).toString()).isEqualTo(uuid.toString());
+        assertThat(new OrderItemId(uuid).toString()).isEqualTo(uuid.toString());
     }
 
     @Test
@@ -119,5 +139,15 @@ class ValueObjectsTest {
         var id = new ProductId(UUID.randomUUID());
         assertThatThrownBy(() -> new ProductSnapshot(id, "Produto", null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    // ─── Eventos de domínio ────────────────────────────────────────────────────
+
+    @Test
+    void late_payment_result_received_occurred_at_is_not_null() {
+        var paymentId = new PaymentId(UUID.randomUUID());
+        var orderId   = new OrderId(UUID.randomUUID());
+        var event     = new LatePaymentResultReceived(paymentId, orderId, "APPROVED");
+        assertThat(event.occurredAt()).isNotNull();
     }
 }

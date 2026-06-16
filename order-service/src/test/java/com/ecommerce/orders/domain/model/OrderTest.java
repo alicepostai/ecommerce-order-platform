@@ -455,6 +455,25 @@ class OrderTest {
                 .isInstanceOf(InvalidStateTransitionException.class);
     }
 
+    @Test
+    void apply_payment_approved_throws_when_not_payment_pending() {
+        var order = confirmedOrder();
+        assertThatThrownBy(order::applyPaymentApproved)
+                .isInstanceOf(InvalidStateTransitionException.class);
+    }
+
+    @Test
+    void remove_second_item_leaves_first_item_intact() {
+        var order = newOrder();
+        var item1Id = OrderItemId.generate();
+        var item2Id = OrderItemId.generate();
+        order.addItem(item1Id, PROD_A, Quantity.of(1));
+        order.addItem(item2Id, PROD_B, Quantity.of(2));
+        order.removeItem(item2Id);
+        assertThat(order.getItems()).hasSize(1);
+        assertThat(order.getItems().get(0).getId()).isEqualTo(item1Id);
+    }
+
     // ── pullDomainEvents limpa a lista ────────────────────────────────────────
 
     @Test

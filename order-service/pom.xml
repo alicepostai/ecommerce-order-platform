@@ -27,6 +27,7 @@
         <pitest-junit5.version>1.2.1</pitest-junit5.version>
         <skipPitest>false</skipPitest>
         <testcontainers.version>1.20.6</testcontainers.version>
+        <argLine></argLine>
     </properties>
 
     <dependencies>
@@ -246,8 +247,19 @@
                         <param>com.ecommerce.orders.domain.*</param>
                     </targetClasses>
                     <targetTests>
-                        <param>com.ecommerce.orders.**</param>
+                        <param>com.ecommerce.orders.domain.*</param>
+                        <param>com.ecommerce.orders.infrastructure.persistence.mapper.*</param>
                     </targetTests>
+                    <excludedTestClasses>
+                        <param>*IntegrationTest</param>
+                        <param>*FilterTest</param>
+                        <param>*DocTest</param>
+                    </excludedTestClasses>
+                    <jvmArgs>
+                        <value>--add-opens=java.base/java.lang=ALL-UNNAMED</value>
+                        <value>--add-opens=java.base/java.util=ALL-UNNAMED</value>
+                        <value>--add-opens=java.base/java.math=ALL-UNNAMED</value>
+                    </jvmArgs>
                     <mutationThreshold>75</mutationThreshold>
                     <coverageThreshold>80</coverageThreshold>
                     <outputFormats>
