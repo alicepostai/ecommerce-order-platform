@@ -45,7 +45,6 @@ public class ProcessPaymentCallbackUseCaseImpl implements ProcessPaymentCallback
 
     @Override
     public void process(ProcessPaymentCallbackCommand command) {
-        // Idempotência por eventId
         if (webhookEventStore.isProcessed(command.eventId())) {
             return;
         }
@@ -57,7 +56,6 @@ public class ProcessPaymentCallbackUseCaseImpl implements ProcessPaymentCallback
         var order = orderRepository.findById(payment.getOrderId())
                 .orElseThrow(() -> new OrderNotFoundException(payment.getOrderId().value().toString()));
 
-        // Webhook tardio: pedido ou pagamento já cancelado
         if (order.getStatus() == OrderStatus.CANCELLED
                 || payment.getStatus() == PaymentStatus.CANCELLED) {
             log.warn("Late webhook received: eventId={}, paymentId={}, orderId={}, webhookStatus={} — order/payment already cancelled",

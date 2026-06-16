@@ -14,10 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Handles split transaction for payment initiation so that the PENDING state
- * is committed before the gateway call (normative S4.8: 502 leaves payment PENDING).
- */
+// Split-transaction: Phase1 commits PENDING before gateway call so that a 502 leaves the state persisted (S4.8).
 @Service
 public class PaymentTransactionHelper {
 
@@ -42,17 +39,13 @@ public class PaymentTransactionHelper {
                                CustomerId customerId, List<DomainEvent> orderEvents,
                                List<DomainEvent> paymentEvents) {}
 
-    /**
-     * Phase 1: validates order state, creates Payment(PENDING), moves order to PAYMENT_PENDING.
-     * Committed independently so that gateway failure leaves the PENDING state in DB.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Phase1Result createPending(UUID orderId) {
         var orderIdVO = new OrderId(orderId);
         var order = orderRepository.findById(orderIdVO)
                 .orElseThrow(() -> new com.ecommerce.orders.domain.exception.OrderNotFoundException(orderId.toString()));
 
-        order.initiatePayment(); // throws if not CONFIRMED or already PENDING
+        order.initiatePayment();
 
         int attemptNumber = order.getPaymentAttempts() + 1;
         var paymentId = new PaymentId(UUID.randomUUID());
@@ -61,7 +54,6 @@ public class PaymentTransactionHelper {
         paymentRepository.save(payment);
         orderRepository.save(order);
 
-        // Publish PaymentInitiated event atomically with state change
         var orderEvents = order.pullDomainEvents();
         if (!orderEvents.isEmpty()) {
             eventPublisher.publishAll(orderEvents, "Order", orderId);
@@ -70,10 +62,6 @@ public class PaymentTransactionHelper {
         return new Phase1Result(paymentId, orderIdVO, order.getTotal(), attemptNumber);
     }
 
-    /**
-     * Phase 2: applies gateway result (APPROVED/REJECTED) to payment and order.
-     * Committed independently. Notifications happen outside after this returns.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Phase2Result applyResult(Phase1Result phase1, PaymentGatewayPort.ChargeResult result) {
         var payment = paymentRepository.findById(phase1.paymentId()).orElseThrow();
@@ -100,7 +88,6 @@ public class PaymentTransactionHelper {
             eventPublisher.publishAll(paymentEvents, "Payment", phase1.paymentId().value());
         }
 
-        // Business metrics
         if (result.status() == PaymentGatewayPort.ChargeStatus.REJECTED) {
             metrics.incrementPaymentsRejected();
             if (order.getStatus() == OrderStatus.CANCELLED) {

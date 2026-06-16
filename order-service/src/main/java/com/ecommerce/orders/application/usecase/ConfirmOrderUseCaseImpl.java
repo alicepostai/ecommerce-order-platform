@@ -66,7 +66,6 @@ public class ConfirmOrderUseCaseImpl implements ConfirmOrderUseCase {
                     Map.of("orderId", order.getId().value().toString()));
         }
 
-        // Count only real transitions (not idempotent re-confirms)
         if (previousStatus == com.ecommerce.orders.domain.model.OrderStatus.CREATED
                 && order.getStatus() == OrderStatus.CONFIRMED) {
             metrics.incrementOrdersConfirmed();
