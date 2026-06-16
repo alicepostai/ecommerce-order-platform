@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('order-service/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build & Unit Tests (domain + ArchUnit)
+        working-directory: order-service
+        run: mvn test -Dtest="MoneyTest,OrderTest,PaymentTest,QuantityTest,ValueObjectsTest,ArchitectureTest,OrderMapperTest,PaymentMapperTest" -q
+
+      - name: Pitest — mutation score ≥ 75% no domínio
+        working-directory: order-service
+        run: mvn org.pitest:pitest-maven:mutationCoverage -DskipPitest=false -q
+
+      - name: Integration Tests (Testcontainers)
+        working-directory: order-service
+        run: mvn test -Dtest="FlywayMigrationTest,OrderRepositoryIntegrationTest,PaymentRepositoryIntegrationTest,ExternalClientsIntegrationTest,OrderUseCasesIntegrationTest,PaymentUseCasesIntegrationTest,WebhookIntegrationTest,ResilienceIntegrationTest,IdempotencyKeyFilterTest,SecurityIntegrationTest,CorrelationIdFilterTest,BusinessMetricsTest,OrderControllerTest,PaymentControllerTest,OpenApiDocTest" -q
+
+      - name: Build Docker image
+        working-directory: order-service
+        run: docker build -t order-service:ci .
+
+      - name: Trivy — scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: order-service:ci
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            order-service/target/surefire-reports/
+            order-service/target/site/jacoco/
+            order-service/target/pit-reports/
+          retention-days: 7
