@@ -50,7 +50,7 @@ class ResilienceIntegrationTest {
 
     @Container
     @SuppressWarnings("resource")
-    static GenericContainer<?> wireMock = new GenericContainer<>("wiremock/wiremock:latest")
+    static GenericContainer<?> wireMock = new GenericContainer<>("wiremock/wiremock:3")
             .withCommand("--global-response-templating")
             .withFileSystemBind(MAPPINGS_PATH, "/home/wiremock/mappings", BindMode.READ_ONLY)
             .withFileSystemBind(FILES_PATH,    "/home/wiremock/__files",  BindMode.READ_ONLY)

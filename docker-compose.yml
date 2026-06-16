@@ -17,7 +17,7 @@ services:
       retries: 10
 
   wiremock:
-    image: wiremock/wiremock:latest
+    image: wiremock/wiremock:3
     container_name: ecommerce-wiremock
     command: --global-response-templating
     ports:
@@ -37,6 +37,9 @@ services:
       - "9090:9090"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      order-service:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:latest

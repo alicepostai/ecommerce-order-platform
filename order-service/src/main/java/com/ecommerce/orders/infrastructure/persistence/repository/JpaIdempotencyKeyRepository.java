@@ -4,6 +4,7 @@ import com.ecommerce.orders.infrastructure.persistence.entity.IdempotencyKeyEnti
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Repository
@@ -11,4 +12,6 @@ public interface JpaIdempotencyKeyRepository
         extends JpaRepository<IdempotencyKeyEntity, IdempotencyKeyEntity.IdempotencyKeyId> {
 
     Optional<IdempotencyKeyEntity> findByKeyAndEndpointScope(String key, String endpointScope);
+
+    void deleteByCreatedAtBefore(Instant cutoff);
 }

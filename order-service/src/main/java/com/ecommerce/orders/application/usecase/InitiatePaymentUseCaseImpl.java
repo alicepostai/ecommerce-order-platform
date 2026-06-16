@@ -7,12 +7,16 @@ import com.ecommerce.orders.application.port.out.NotificationPort;
 import com.ecommerce.orders.application.port.out.PaymentGatewayPort;
 import com.ecommerce.orders.domain.model.CustomerId;
 import com.ecommerce.orders.domain.model.OrderStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
 @Service
 public class InitiatePaymentUseCaseImpl implements InitiatePaymentUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(InitiatePaymentUseCaseImpl.class);
 
     private final PaymentTransactionHelper txHelper;
     private final PaymentGatewayPort paymentGateway;
@@ -54,6 +58,7 @@ public class InitiatePaymentUseCaseImpl implements InitiatePaymentUseCase {
                 notificationPort.send(customerId, template, Map.of("orderId", orderId));
             }
         } catch (Exception e) {
+            log.warn("Notification failed for orderId={}: {}", orderId, e.getMessage());
         }
     }
 }
