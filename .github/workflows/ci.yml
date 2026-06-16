@@ -34,9 +34,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Build & Unit Tests (domain + ArchUnit)
+      - name: Build & Unit Tests (domain + ArchUnit + web slice)
         working-directory: order-service
-        run: mvn test -Dtest="MoneyTest,OrderTest,PaymentTest,QuantityTest,ValueObjectsTest,ArchitectureTest,OrderMapperTest,PaymentMapperTest" -q
+        run: mvn test -Dtest="MoneyTest,OrderTest,PaymentTest,QuantityTest,ValueObjectsTest,ArchitectureTest,OrderMapperTest,PaymentMapperTest,BusinessMetricsTest,OrderControllerTest,PaymentControllerTest,OpenApiDocTest" -q
 
       - name: Pitest — mutation score ≥ 75% no domínio
         working-directory: order-service
@@ -44,7 +44,7 @@ jobs:
 
       - name: Integration Tests (Testcontainers)
         working-directory: order-service
-        run: mvn test -Dtest="FlywayMigrationTest,OrderRepositoryIntegrationTest,PaymentRepositoryIntegrationTest,ExternalClientsIntegrationTest,OrderUseCasesIntegrationTest,PaymentUseCasesIntegrationTest,WebhookIntegrationTest,ResilienceIntegrationTest,IdempotencyKeyFilterTest,SecurityIntegrationTest,CorrelationIdFilterTest,BusinessMetricsTest,OrderControllerTest,PaymentControllerTest,OpenApiDocTest" -q
+        run: mvn test -Dtest="FlywayMigrationTest,OrderRepositoryIntegrationTest,PaymentRepositoryIntegrationTest,ExternalClientsIntegrationTest,OrderUseCasesIntegrationTest,PaymentUseCasesIntegrationTest,WebhookIntegrationTest,ResilienceIntegrationTest,IdempotencyKeyFilterTest,SecurityIntegrationTest,CorrelationIdFilterTest" -q
 
       - name: Build Docker image
         working-directory: order-service
