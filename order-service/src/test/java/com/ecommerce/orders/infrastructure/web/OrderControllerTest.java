@@ -2,6 +2,7 @@ package com.ecommerce.orders.infrastructure.web;
 
 import com.ecommerce.orders.application.dto.*;
 import com.ecommerce.orders.application.port.in.*;
+import com.ecommerce.orders.application.port.out.IdempotencyStore;
 import com.ecommerce.orders.domain.exception.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class OrderControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockBean JwtDecoder jwtDecoder;
+    @MockBean IdempotencyStore idempotencyStore;
     @MockBean CreateOrderUseCase createOrder;
     @MockBean GetOrderUseCase getOrder;
     @MockBean ListCustomerOrdersUseCase listOrders;
