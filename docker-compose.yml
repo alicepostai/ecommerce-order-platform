@@ -17,7 +17,7 @@ services:
       retries: 10
 
   wiremock:
-    image: wiremock/wiremock:3
+    image: wiremock/wiremock:latest
     container_name: ecommerce-wiremock
     command: --global-response-templating
     ports:
