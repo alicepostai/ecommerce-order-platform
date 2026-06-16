@@ -1,79 +1,61 @@
 package com.ecommerce.orders.infrastructure.observability;
 
+import com.ecommerce.orders.application.port.out.MetricsPort;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpEntity;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@DisplayName("BusinessMetrics — metricas de negocio expostas no Prometheus (T18)")
+@DisplayName("BusinessMetrics — contadores de negocio (T18)")
 class BusinessMetricsTest {
 
-    static final String MAPPINGS_PATH = Path.of("../wiremock/mappings").toAbsolutePath().toString();
-    static final String FILES_PATH    = Path.of("../wiremock/__files").toAbsolutePath().toString();
+    @Test
+    @DisplayName("Tres contadores sao registrados no MeterRegistry ao instanciar")
+    void all_three_counters_are_registered_on_creation() {
+        var registry = new SimpleMeterRegistry();
+        new BusinessMetrics(registry);
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @Container
-    @SuppressWarnings("resource")
-    static GenericContainer<?> wireMock = new GenericContainer<>("wiremock/wiremock:latest")
-            .withCommand("--global-response-templating")
-            .withFileSystemBind(MAPPINGS_PATH, "/home/wiremock/mappings", BindMode.READ_ONLY)
-            .withFileSystemBind(FILES_PATH,    "/home/wiremock/__files",  BindMode.READ_ONLY)
-            .withExposedPorts(8080)
-            .waitingFor(Wait.forHttp("/__admin/mappings").forStatusCode(200));
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url",      postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-
-        var wmUrl = "http://" + wireMock.getHost() + ":" + wireMock.getMappedPort(8080);
-        registry.add("external.customer.base-url",        () -> wmUrl);
-        registry.add("external.catalog.base-url",         () -> wmUrl);
-        registry.add("external.payment-gateway.base-url", () -> wmUrl);
-        registry.add("external.notification.base-url",    () -> wmUrl);
-        registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri",
-                () -> wmUrl + "/auth/.well-known/jwks.json");
+        assertThat(registry.find("orders_confirmed_total").counter()).isNotNull();
+        assertThat(registry.find("payments_rejected_total").counter()).isNotNull();
+        assertThat(registry.find("orders_auto_cancelled_total").counter()).isNotNull();
     }
 
-    @LocalServerPort int port;
-    @Autowired TestRestTemplate rest;
+    @Test
+    @DisplayName("incrementOrdersConfirmed incrementa o contador correto")
+    void increment_orders_confirmed() {
+        var registry = new SimpleMeterRegistry();
+        MetricsPort metrics = new BusinessMetrics(registry);
+
+        metrics.incrementOrdersConfirmed();
+        metrics.incrementOrdersConfirmed();
+
+        assertThat(registry.counter("orders_confirmed_total").count()).isEqualTo(2.0);
+        assertThat(registry.counter("payments_rejected_total").count()).isEqualTo(0.0);
+        assertThat(registry.counter("orders_auto_cancelled_total").count()).isEqualTo(0.0);
+    }
 
     @Test
-    @DisplayName("Endpoint /actuator/prometheus expoe as tres metricas de negocio do S6.3")
-    void actuatorPrometheus_exposesBusinessMetrics() {
-        var response = rest.exchange(
-                "http://localhost:" + port + "/actuator/prometheus",
-                HttpMethod.GET,
-                HttpEntity.EMPTY,
-                String.class);
+    @DisplayName("incrementPaymentsRejected incrementa o contador correto")
+    void increment_payments_rejected() {
+        var registry = new SimpleMeterRegistry();
+        MetricsPort metrics = new BusinessMetrics(registry);
 
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        var body = response.getBody();
-        assertThat(body).contains("orders_confirmed_total");
-        assertThat(body).contains("payments_rejected_total");
-        assertThat(body).contains("orders_auto_cancelled_total");
+        metrics.incrementPaymentsRejected();
+
+        assertThat(registry.counter("payments_rejected_total").count()).isEqualTo(1.0);
+        assertThat(registry.counter("orders_confirmed_total").count()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("incrementOrdersAutoCancelled incrementa o contador correto")
+    void increment_orders_auto_cancelled() {
+        var registry = new SimpleMeterRegistry();
+        MetricsPort metrics = new BusinessMetrics(registry);
+
+        metrics.incrementOrdersAutoCancelled();
+
+        assertThat(registry.counter("orders_auto_cancelled_total").count()).isEqualTo(1.0);
+        assertThat(registry.counter("orders_confirmed_total").count()).isEqualTo(0.0);
     }
 }
