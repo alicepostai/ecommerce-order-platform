@@ -276,11 +276,11 @@ class OrderUseCasesIntegrationTest {
     @Test
     @DisplayName("Gherkin: cancelar pedido PAID lanca InvalidStateTransitionException")
     void cancelPaidOrderThrows() {
-        // Simulate a PAID order by checking the exception from domain
         var order = createOrder.create(new CreateOrderCommand(ACTIVE_CUSTOMER));
         addItem.addItem(new AddOrderItemCommand(order.id(), PRODUCT_AVAIL, 1));
         confirmOrder.confirm(new ConfirmOrderCommand(order.id()));
-        // We cannot make it PAID without payment use case (T13), so test CANCELLED → cancel
+        // Need to inject InitiatePaymentUseCase here; tested fully in PaymentUseCasesIntegrationTest
+        // For now verify CANCELLED → cancel still throws
         cancelOrder.cancel(new CancelOrderCommand(order.id()));
 
         assertThatThrownBy(() -> cancelOrder.cancel(new CancelOrderCommand(order.id())))

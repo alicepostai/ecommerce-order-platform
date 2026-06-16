@@ -63,6 +63,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "item-not-found", "Item Not Found", ex.getMessage());
     }
 
+    @ExceptionHandler(PaymentNotFoundException.class)
+    ResponseEntity<ProblemDetail> handlePaymentNotFound(PaymentNotFoundException ex) {
+        return problem(HttpStatus.NOT_FOUND, "payment-not-found", "Payment Not Found", ex.getMessage());
+    }
+
     @ExceptionHandler(ProductUnavailableException.class)
     ResponseEntity<ProblemDetail> handleProductUnavailable(ProductUnavailableException ex) {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "product-unavailable", "Product Unavailable", ex.getMessage());
