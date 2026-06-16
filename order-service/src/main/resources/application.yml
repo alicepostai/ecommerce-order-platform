@@ -42,6 +42,10 @@ external:
   notification:
     base-url: http://localhost:8080
 
+spring.mvc:
+  problemdetails:
+    enabled: true
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
