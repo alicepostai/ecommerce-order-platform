@@ -21,7 +21,7 @@ public class IdempotencyKeyEntity {
     @Column(name = "endpoint_scope", nullable = false, length = 120)
     private String endpointScope;
 
-    @Column(name = "request_hash", nullable = false, length = 64)  // SHA-256 hex = 64 chars
+    @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
     @Column(name = "response_status", nullable = false)

@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-// Split-transaction: Phase1 commits PENDING before gateway call so that a 502 leaves the state persisted (S4.8).
 @Service
 public class PaymentTransactionHelper {
 

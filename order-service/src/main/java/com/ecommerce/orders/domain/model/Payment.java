@@ -45,10 +45,8 @@ public class Payment {
         return new Payment(id, orderId, amount, status, attemptNumber, transactionId);
     }
 
-    // ── Comandos ─────────────────────────────────────────────────────────────
-
     public void approve(String transactionId) {
-        if (status == PaymentStatus.APPROVED) return; // idempotente
+        if (status == PaymentStatus.APPROVED) return;
         requireStatus(PaymentStatus.PENDING, "invalid-payment-state");
         this.status = PaymentStatus.APPROVED;
         this.transactionId = transactionId;
@@ -63,7 +61,7 @@ public class Payment {
     }
 
     public void cancel() {
-        if (status == PaymentStatus.CANCELLED) return; // idempotente
+        if (status == PaymentStatus.CANCELLED) return;
         if (status == PaymentStatus.APPROVED || status == PaymentStatus.REJECTED)
             throw new InvalidStateTransitionException("payment-not-cancellable",
                     "Cannot cancel a payment in status " + status);
@@ -71,15 +69,11 @@ public class Payment {
         registerEvent(new PaymentCancelled(id, orderId));
     }
 
-    // ── Eventos de domínio ───────────────────────────────────────────────────
-
     public List<DomainEvent> pullDomainEvents() {
         var snapshot = List.copyOf(domainEvents);
         domainEvents.clear();
         return snapshot;
     }
-
-    // ── Getters ──────────────────────────────────────────────────────────────
 
     public PaymentId getId() { return id; }
     public OrderId getOrderId() { return orderId; }
@@ -87,8 +81,6 @@ public class Payment {
     public PaymentStatus getStatus() { return status; }
     public int getAttemptNumber() { return attemptNumber; }
     public String getTransactionId() { return transactionId; }
-
-    // ── Helpers privados ─────────────────────────────────────────────────────
 
     private void requireStatus(PaymentStatus required, String errorCode) {
         if (status != required)

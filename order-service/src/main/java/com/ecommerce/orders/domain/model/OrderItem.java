@@ -14,7 +14,6 @@ public class OrderItem {
         this.quantity = quantity;
     }
 
-    /** Reconstitui um item já persistido (productName e unitPrice podem ser nulos antes da confirmação). */
     public static OrderItem reconstitute(OrderItemId id, ProductId productId,
                                          String productName, Quantity quantity, Money unitPrice) {
         var item = new OrderItem(id, productId, quantity);

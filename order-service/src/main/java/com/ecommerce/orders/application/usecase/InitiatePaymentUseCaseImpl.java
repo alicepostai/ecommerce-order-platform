@@ -32,14 +32,12 @@ public class InitiatePaymentUseCaseImpl implements InitiatePaymentUseCase {
 
     @Override
     public PaymentResult initiatePayment(InitiatePaymentCommand command) {
-        // Phase 1: validate + create PENDING — committed immediately (normative S4.8)
+
         var phase1 = txHelper.createPending(command.orderId());
 
-        // Gateway call — outside any transaction; 502 leaves phase 1 committed
         var result = paymentGateway.charge(
                 phase1.paymentId(), phase1.orderId(), phase1.amount(), command.cardToken());
 
-        // Phase 2: apply result — committed immediately
         var phase2 = txHelper.applyResult(phase1, result);
 
         safeNotify(phase2.customerId(), phase2.finalOrderStatus(), phase1.orderId().value().toString());

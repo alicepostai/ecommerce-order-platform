@@ -51,7 +51,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Skip rate limiting for actuator and static swagger resources
         String path = request.getRequestURI();
         if (path.startsWith("/actuator") || path.startsWith("/swagger-ui") || path.startsWith("/api-docs")) {
             filterChain.doFilter(request, response);
@@ -79,10 +78,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String resolveKey(HttpServletRequest request) {
-        // Per-token bucket when Authorization header present; fall back to IP
+
         var auth = request.getHeader("Authorization");
         if (auth != null && auth.startsWith("Bearer ") && auth.length() > 20) {
-            // Use first 120 chars of token (past the common JWT header into the payload)
+
             return "token:" + auth.substring(7, Math.min(auth.length(), 120));
         }
         return "ip:" + request.getRemoteAddr();

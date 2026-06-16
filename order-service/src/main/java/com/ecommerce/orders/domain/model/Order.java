@@ -34,7 +34,6 @@ public class Order {
         return order;
     }
 
-    /** Reconstitui um pedido já persistido sem disparar eventos de domínio. */
     public static Order reconstitute(OrderId id, CustomerId customerId, OrderStatus status,
                                      List<OrderItem> items, Money total,
                                      int paymentAttempts, CancellationReason cancellationReason) {
@@ -46,8 +45,6 @@ public class Order {
         order.cancellationReason = cancellationReason;
         return order;
     }
-
-    // ── Comandos ─────────────────────────────────────────────────────────────
 
     public void addItem(OrderItemId itemId, ProductId productId, Quantity quantity) {
         requireStatus(OrderStatus.CREATED, "order-not-modifiable");
@@ -69,7 +66,7 @@ public class Order {
     }
 
     public void confirm(Map<ProductId, ProductSnapshot> snapshots) {
-        if (status == OrderStatus.CONFIRMED) return; // idempotente
+        if (status == OrderStatus.CONFIRMED) return;
         requireStatus(OrderStatus.CREATED, "order-not-confirmable");
         if (items.isEmpty())
             throw new InvalidStateTransitionException("empty-order", "Order has no items to confirm");
@@ -111,7 +108,7 @@ public class Order {
     }
 
     public void applyPaymentApproved() {
-        if (status == OrderStatus.PAID) return; // idempotente
+        if (status == OrderStatus.PAID) return;
         requireStatus(OrderStatus.PAYMENT_PENDING, "invalid-payment-state");
         this.status = OrderStatus.PAID;
         registerEvent(new OrderPaid(id));
@@ -129,15 +126,11 @@ public class Order {
         }
     }
 
-    // ── Eventos de domínio ───────────────────────────────────────────────────
-
     public List<DomainEvent> pullDomainEvents() {
         var snapshot = List.copyOf(domainEvents);
         domainEvents.clear();
         return snapshot;
     }
-
-    // ── Getters ──────────────────────────────────────────────────────────────
 
     public OrderId getId() { return id; }
     public CustomerId getCustomerId() { return customerId; }
@@ -146,8 +139,6 @@ public class Order {
     public Money getTotal() { return total; }
     public int getPaymentAttempts() { return paymentAttempts; }
     public CancellationReason getCancellationReason() { return cancellationReason; }
-
-    // ── Helpers privados ─────────────────────────────────────────────────────
 
     private void requireStatus(OrderStatus required, String errorCode) {
         if (status != required)

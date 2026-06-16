@@ -37,7 +37,7 @@ public class AddOrderItemUseCaseImpl implements AddOrderItemUseCase {
                 .orElseThrow(() -> new OrderNotFoundException(orderId.value().toString()));
 
         var productId = new ProductId(command.productId());
-        catalogGateway.fetchProduct(productId); // validates availability
+        catalogGateway.fetchProduct(productId);
 
         order.addItem(OrderItemId.generate(), productId, new Quantity(command.quantity()));
         orderRepository.save(order);
