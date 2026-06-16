@@ -1,5 +1,7 @@
 package com.ecommerce.orders.infrastructure.config;
 
+import com.ecommerce.orders.infrastructure.observability.CorrelationIdFilter;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,33 +27,41 @@ public class RestClientConfig {
 
     @Bean("customerRestClient")
     public RestClient customerRestClient(RestClient.Builder builder) {
-        return builder.clone()
+        return withCorrelation(builder.clone()
                 .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
-                .baseUrl(customerBaseUrl)
-                .build();
+                .baseUrl(customerBaseUrl));
     }
 
     @Bean("catalogRestClient")
     public RestClient catalogRestClient(RestClient.Builder builder) {
-        return builder.clone()
+        return withCorrelation(builder.clone()
                 .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
-                .baseUrl(catalogBaseUrl)
-                .build();
+                .baseUrl(catalogBaseUrl));
     }
 
     @Bean("paymentGatewayRestClient")
     public RestClient paymentGatewayRestClient(RestClient.Builder builder) {
-        return builder.clone()
+        return withCorrelation(builder.clone()
                 .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
-                .baseUrl(paymentGatewayBaseUrl)
-                .build();
+                .baseUrl(paymentGatewayBaseUrl));
     }
 
     @Bean("notificationRestClient")
     public RestClient notificationRestClient(RestClient.Builder builder) {
-        return builder.clone()
+        return withCorrelation(builder.clone()
                 .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(3)))
-                .baseUrl(notificationBaseUrl)
+                .baseUrl(notificationBaseUrl));
+    }
+
+    private RestClient withCorrelation(RestClient.Builder builder) {
+        return builder
+                .requestInterceptor((request, body, execution) -> {
+                    var correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
+                    if (correlationId != null) {
+                        request.getHeaders().set(CorrelationIdFilter.HEADER_NAME, correlationId);
+                    }
+                    return execution.execute(request, body);
+                })
                 .build();
     }
 
