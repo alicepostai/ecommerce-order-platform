@@ -28,6 +28,8 @@
         <skipPitest>false</skipPitest>
         <testcontainers.version>1.20.6</testcontainers.version>
         <argLine></argLine>
+        <tomcat.version>10.1.55</tomcat.version>
+        <spring-security.version>6.5.9</spring-security.version>
     </properties>
 
     <dependencies>
