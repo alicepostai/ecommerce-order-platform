@@ -4,6 +4,7 @@ import com.ecommerce.orders.application.dto.PaymentResult;
 import com.ecommerce.orders.application.exception.ExternalServiceException;
 import com.ecommerce.orders.application.port.in.GetPaymentUseCase;
 import com.ecommerce.orders.application.port.in.InitiatePaymentUseCase;
+import com.ecommerce.orders.application.port.in.ProcessPaymentCallbackUseCase;
 import com.ecommerce.orders.application.port.out.IdempotencyStore;
 import com.ecommerce.orders.domain.exception.InvalidStateTransitionException;
 import com.ecommerce.orders.domain.exception.OrderNotFoundException;
@@ -24,6 +25,8 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -46,6 +49,7 @@ class PaymentControllerTest {
     @MockBean IdempotencyStore idempotencyStore;
     @MockBean InitiatePaymentUseCase initiatePayment;
     @MockBean GetPaymentUseCase getPayment;
+    @MockBean ProcessPaymentCallbackUseCase processCallback;
 
     // ── POST /api/v1/payments ────────────────────────────────────────────────
 
@@ -192,6 +196,49 @@ class PaymentControllerTest {
         mockMvc.perform(get("/api/v1/payments/{id}", PAYMENT_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("SCOPE_orders:read"))))
                 .andExpect(status().isForbidden());
+    }
+
+    // ── POST /api/v1/payments/{paymentId}/callback ───────────────────────────
+
+    @Test
+    @DisplayName("POST /payments/{id}/callback com status APPROVED retorna 200")
+    void callback_200_approved() throws Exception {
+        doNothing().when(processCallback).process(any());
+
+        mockMvc.perform(post("/api/v1/payments/{id}/callback", PAYMENT_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("SCOPE_payments:write")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventId":"evt-001","paymentId":"%s","status":"APPROVED","transactionId":"tx-001"}
+                                """.formatted(PAYMENT_ID)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /payments/{id}/callback com pagamento inexistente retorna 404")
+    void callback_404_paymentNotFound() throws Exception {
+        doThrow(new PaymentNotFoundException(PAYMENT_ID.toString())).when(processCallback).process(any());
+
+        mockMvc.perform(post("/api/v1/payments/{id}/callback", PAYMENT_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("SCOPE_payments:write")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventId":"evt-001","paymentId":"%s","status":"APPROVED","transactionId":"tx-001"}
+                                """.formatted(PAYMENT_ID)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://api.ecommerce.dev/problems/payment-not-found"));
+    }
+
+    @Test
+    @DisplayName("POST /payments/{id}/callback com payload invalido retorna 400")
+    void callback_400_missingEventId() throws Exception {
+        mockMvc.perform(post("/api/v1/payments/{id}/callback", PAYMENT_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("SCOPE_payments:write")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"paymentId":"%s","status":"APPROVED","transactionId":"tx-001"}
+                                """.formatted(PAYMENT_ID)))
+                .andExpect(status().isBadRequest());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
