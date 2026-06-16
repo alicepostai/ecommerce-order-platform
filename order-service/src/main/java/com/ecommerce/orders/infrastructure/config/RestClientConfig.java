@@ -26,7 +26,7 @@ public class RestClientConfig {
     @Bean("customerRestClient")
     public RestClient customerRestClient(RestClient.Builder builder) {
         return builder.clone()
-                .requestFactory(requestFactory())
+                .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
                 .baseUrl(customerBaseUrl)
                 .build();
     }
@@ -34,7 +34,7 @@ public class RestClientConfig {
     @Bean("catalogRestClient")
     public RestClient catalogRestClient(RestClient.Builder builder) {
         return builder.clone()
-                .requestFactory(requestFactory())
+                .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
                 .baseUrl(catalogBaseUrl)
                 .build();
     }
@@ -42,7 +42,7 @@ public class RestClientConfig {
     @Bean("paymentGatewayRestClient")
     public RestClient paymentGatewayRestClient(RestClient.Builder builder) {
         return builder.clone()
-                .requestFactory(requestFactory())
+                .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(2)))
                 .baseUrl(paymentGatewayBaseUrl)
                 .build();
     }
@@ -50,15 +50,15 @@ public class RestClientConfig {
     @Bean("notificationRestClient")
     public RestClient notificationRestClient(RestClient.Builder builder) {
         return builder.clone()
-                .requestFactory(requestFactory())
+                .requestFactory(requestFactory(Duration.ofSeconds(1), Duration.ofSeconds(3)))
                 .baseUrl(notificationBaseUrl)
                 .build();
     }
 
-    private SimpleClientHttpRequestFactory requestFactory() {
+    private SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {
         var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(5));
+        factory.setConnectTimeout(connectTimeout);
+        factory.setReadTimeout(readTimeout);
         return factory;
     }
 }

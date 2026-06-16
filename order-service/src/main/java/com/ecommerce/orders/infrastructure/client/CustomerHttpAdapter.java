@@ -5,6 +5,8 @@ import com.ecommerce.orders.application.port.out.CustomerGateway;
 import com.ecommerce.orders.domain.exception.CustomerBlockedException;
 import com.ecommerce.orders.domain.exception.CustomerNotFoundException;
 import com.ecommerce.orders.domain.model.CustomerId;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,8 @@ public class CustomerHttpAdapter implements CustomerGateway {
     }
 
     @Override
+    @CircuitBreaker(name = "customerService")
+    @Retry(name = "customerService")
     public void validateActiveCustomer(CustomerId customerId) {
         restClient.get()
                 .uri("/customers/{id}", customerId.value())

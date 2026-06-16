@@ -7,6 +7,8 @@ import com.ecommerce.orders.domain.model.OrderId;
 import com.ecommerce.orders.domain.model.PaymentId;
 import com.ecommerce.orders.infrastructure.client.dto.PaymentGatewayRequest;
 import com.ecommerce.orders.infrastructure.client.dto.PaymentGatewayResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,8 @@ public class PaymentGatewayHttpAdapter implements PaymentGatewayPort {
     }
 
     @Override
+    @CircuitBreaker(name = "paymentGateway")
+    @Retry(name = "paymentGateway")
     public ChargeResult charge(PaymentId paymentId, OrderId orderId, Money amount, String cardToken) {
         var request = new PaymentGatewayRequest(
                 paymentId.value().toString(),

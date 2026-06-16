@@ -2,6 +2,7 @@ package com.ecommerce.orders.infrastructure.web;
 
 import com.ecommerce.orders.application.exception.ExternalServiceException;
 import com.ecommerce.orders.domain.exception.*;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -89,6 +90,13 @@ public class GlobalExceptionHandler {
         log.warn("External service error: {}", ex.getMessage());
         return problem(HttpStatus.BAD_GATEWAY, "external-service-unavailable",
                 "External Service Unavailable", ex.getMessage());
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    ResponseEntity<ProblemDetail> handleCircuitBreakerOpen(CallNotPermittedException ex) {
+        log.warn("Circuit breaker open: {}", ex.getMessage());
+        return problem(HttpStatus.BAD_GATEWAY, "external-service-unavailable",
+                "External Service Unavailable", "Service temporarily unavailable — please try again later");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

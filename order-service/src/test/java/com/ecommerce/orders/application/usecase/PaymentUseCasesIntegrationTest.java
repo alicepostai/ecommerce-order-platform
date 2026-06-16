@@ -5,14 +5,15 @@ import com.ecommerce.orders.application.port.in.*;
 import com.ecommerce.orders.domain.exception.InvalidStateTransitionException;
 import com.ecommerce.orders.domain.exception.OrderNotFoundException;
 import com.ecommerce.orders.domain.exception.PaymentNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -28,7 +29,6 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Transactional
 @DisplayName("Payment use cases — integração (Gherkin S5)")
 class PaymentUseCasesIntegrationTest {
 
@@ -65,6 +65,7 @@ class PaymentUseCasesIntegrationTest {
                 () -> wmUrl + "/auth/.well-known/jwks.json");
     }
 
+    @Autowired JdbcTemplate jdbc;
     @Autowired CreateOrderUseCase     createOrder;
     @Autowired AddOrderItemUseCase    addItem;
     @Autowired ConfirmOrderUseCase    confirmOrder;
@@ -72,7 +73,16 @@ class PaymentUseCasesIntegrationTest {
     @Autowired InitiatePaymentUseCase initiatePayment;
     @Autowired GetPaymentUseCase      getPayment;
 
-    // Helper: cria um pedido CONFIRMED com 1 item (produto aaaa = R$199,90)
+    @BeforeEach
+    void cleanup() {
+        jdbc.execute("DELETE FROM processed_webhook_events");
+        jdbc.execute("DELETE FROM domain_events");
+        jdbc.execute("DELETE FROM payments");
+        jdbc.execute("DELETE FROM order_items");
+        jdbc.execute("DELETE FROM orders");
+        jdbc.execute("DELETE FROM idempotency_keys");
+    }
+
     private UUID confirmedOrder() {
         var order = createOrder.create(new CreateOrderCommand(ACTIVE_CUSTOMER));
         addItem.addItem(new AddOrderItemCommand(order.id(), PRODUCT_AVAIL, 1));

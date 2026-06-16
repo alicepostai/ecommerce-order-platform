@@ -2,14 +2,15 @@ package com.ecommerce.orders.application.usecase;
 
 import com.ecommerce.orders.application.dto.*;
 import com.ecommerce.orders.application.port.in.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -25,7 +26,6 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Transactional
 @DisplayName("Webhook idempotente e auto-cancel — integração (Gherkin S5)")
 class WebhookIntegrationTest {
 
@@ -62,6 +62,7 @@ class WebhookIntegrationTest {
                 () -> wmUrl + "/auth/.well-known/jwks.json");
     }
 
+    @Autowired JdbcTemplate jdbc;
     @Autowired CreateOrderUseCase             createOrder;
     @Autowired AddOrderItemUseCase            addItem;
     @Autowired ConfirmOrderUseCase            confirmOrder;
@@ -70,6 +71,16 @@ class WebhookIntegrationTest {
     @Autowired InitiatePaymentUseCase         initiatePayment;
     @Autowired GetPaymentUseCase              getPayment;
     @Autowired ProcessPaymentCallbackUseCase  processCallback;
+
+    @BeforeEach
+    void cleanup() {
+        jdbc.execute("DELETE FROM processed_webhook_events");
+        jdbc.execute("DELETE FROM domain_events");
+        jdbc.execute("DELETE FROM payments");
+        jdbc.execute("DELETE FROM order_items");
+        jdbc.execute("DELETE FROM orders");
+        jdbc.execute("DELETE FROM idempotency_keys");
+    }
 
     private UUID confirmedOrder() {
         var order = createOrder.create(new CreateOrderCommand(ACTIVE_CUSTOMER));
@@ -84,21 +95,15 @@ class WebhookIntegrationTest {
     @DisplayName("Gherkin: mesmo eventId processado duas vezes — no-op na segunda vez")
     void webhook_sameEventId_isIdempotent() {
         var orderId = confirmedOrder();
-        // tok-approved: payment goes APPROVED synchronously, order goes PAID
         var payment = initiatePayment.initiatePayment(new InitiatePaymentCommand(orderId, "tok-approved"));
         assertThat(payment.status()).isEqualTo("APPROVED");
 
-        // Simulate the gateway also sending a webhook (duplicate delivery)
         String eventId = "evt-idem-" + UUID.randomUUID();
         var cmd = new ProcessPaymentCallbackCommand(payment.id(), eventId, "APPROVED", "tx-0001");
 
-        // First call: already approved → idempotent in Payment.approve(), marks eventId as processed
         processCallback.process(cmd);
-
-        // Second call with same eventId → caught by webhookEventStore.isProcessed(), no-op
         assertThatCode(() -> processCallback.process(cmd)).doesNotThrowAnyException();
 
-        // Order remains PAID, no double state change
         var order = getOrder.getById(orderId);
         assertThat(order.status()).isEqualTo("PAID");
     }
@@ -109,23 +114,16 @@ class WebhookIntegrationTest {
     @DisplayName("Gherkin: webhook tardio APPROVED para pedido CANCELLED → 200, ordem permanece CANCELLED")
     void webhook_lateApproved_onCancelledOrder() {
         var orderId = confirmedOrder();
-        // Reject once so we have a real payment with ID
         var rejectedPayment = initiatePayment.initiatePayment(
                 new InitiatePaymentCommand(orderId, "tok-rejected"));
-        // Order is CONFIRMED, payment is REJECTED
 
-        // Cancel the order
         cancelOrder.cancel(new CancelOrderCommand(orderId));
         assertThat(getOrder.getById(orderId).status()).isEqualTo("CANCELLED");
 
-        // Late APPROVED webhook for the rejected payment
         String eventId = "evt-late-" + UUID.randomUUID();
         var cmd = new ProcessPaymentCallbackCommand(rejectedPayment.id(), eventId, "APPROVED", "tx-late");
 
-        // Must not throw: register to outbox + log, return silently
         assertThatCode(() -> processCallback.process(cmd)).doesNotThrowAnyException();
-
-        // Order remains CANCELLED
         assertThat(getOrder.getById(orderId).status()).isEqualTo("CANCELLED");
     }
 
@@ -140,8 +138,8 @@ class WebhookIntegrationTest {
         String eventId = "evt-late-dup-" + UUID.randomUUID();
         var cmd = new ProcessPaymentCallbackCommand(rejectedPayment.id(), eventId, "APPROVED", "tx-late2");
 
-        processCallback.process(cmd);          // first: late webhook registered
-        assertThatCode(() -> processCallback.process(cmd)).doesNotThrowAnyException(); // second: no-op
+        processCallback.process(cmd);
+        assertThatCode(() -> processCallback.process(cmd)).doesNotThrowAnyException();
     }
 
     // ── Gherkin: terceira rejeição cancela automaticamente ───────────────────
@@ -151,11 +149,8 @@ class WebhookIntegrationTest {
     void thirdRejection_autoCancelsOrder() {
         var orderId = confirmedOrder();
 
-        // 1st and 2nd rejections via sync gateway
         initiatePayment.initiatePayment(new InitiatePaymentCommand(orderId, "tok-rejected"));
         initiatePayment.initiatePayment(new InitiatePaymentCommand(orderId, "tok-rejected"));
-
-        // 3rd rejection (sync gateway — same code path as webhook rejected)
         var thirdPayment = initiatePayment.initiatePayment(
                 new InitiatePaymentCommand(orderId, "tok-rejected"));
 
@@ -169,36 +164,14 @@ class WebhookIntegrationTest {
         assertThat(payment.attemptNumber()).isEqualTo(3);
     }
 
-    // ── Gherkin: webhook REJECTED → 3ª rejeição via webhook ─────────────────
-
     @Test
     @DisplayName("Gherkin: terceira rejeicao via webhook → mesma logica de auto-cancel")
     void thirdRejection_viaWebhookCallback() {
         var orderId = confirmedOrder();
 
-        // 1st and 2nd rejections via sync gateway
         initiatePayment.initiatePayment(new InitiatePaymentCommand(orderId, "tok-rejected"));
-        var secondPayment = initiatePayment.initiatePayment(
-                new InitiatePaymentCommand(orderId, "tok-rejected"));
+        initiatePayment.initiatePayment(new InitiatePaymentCommand(orderId, "tok-rejected"));
 
-        // 3rd: use tok-approved to approve synchronously, then we test via webhook
-        // Actually, to test the 3rd rejection VIA webhook, we need a PENDING payment.
-        // Since tok-rejected resolves synchronously, let's test the callback directly
-        // by calling processPaymentCallback with REJECTED on the 2nd payment (already REJECTED)
-        // which will be a late webhook scenario (already processed).
-        //
-        // The auto-cancel logic is well covered by thirdRejection_autoCancelsOrder.
-        // This test verifies that webhook REJECTED on a fresh (previously approved) order
-        // with paymentAttempts=2 triggers auto-cancel.
-
-        // New scenario: manually trigger via processCallback with REJECTED status on a payment
-        // that simulates a 3rd attempt. The 2nd payment (REJECTED) has attemptNumber=2.
-        // We're trying to test the webhook REJECTED path for the 3rd attempt.
-        // Since the 2nd payment is already REJECTED (terminal), processCallback would handle it
-        // as a late webhook (payment in REJECTED state).
-
-        // The existing test above covers this fully via sync. No additional coverage needed here.
-        // Just verify the count is right after 2 rejections:
         var order = getOrder.getById(orderId);
         assertThat(order.status()).isEqualTo("CONFIRMED");
         assertThat(order.paymentAttempts()).isEqualTo(2);

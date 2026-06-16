@@ -8,6 +8,8 @@ import com.ecommerce.orders.domain.model.Money;
 import com.ecommerce.orders.domain.model.ProductId;
 import com.ecommerce.orders.domain.model.ProductSnapshot;
 import com.ecommerce.orders.infrastructure.client.dto.ProductResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -25,6 +27,8 @@ public class CatalogHttpAdapter implements ProductCatalogGateway {
     }
 
     @Override
+    @CircuitBreaker(name = "catalogService")
+    @Retry(name = "catalogService")
     public ProductSnapshot fetchProduct(ProductId productId) {
         var response = restClient.get()
                 .uri("/products/{id}", productId.value())

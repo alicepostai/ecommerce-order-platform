@@ -51,3 +51,46 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /api-docs
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentGateway:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        registerHealthIndicator: true
+      customerService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        registerHealthIndicator: true
+      catalogService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        registerHealthIndicator: true
+  retry:
+    instances:
+      paymentGateway:
+        maxAttempts: 3
+        waitDuration: 200ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - com.ecommerce.orders.application.exception.ExternalServiceException
+          - org.springframework.web.client.ResourceAccessException
+      customerService:
+        maxAttempts: 2
+        waitDuration: 200ms
+        retryExceptions:
+          - com.ecommerce.orders.application.exception.ExternalServiceException
+          - org.springframework.web.client.ResourceAccessException
+      catalogService:
+        maxAttempts: 2
+        waitDuration: 200ms
+        retryExceptions:
+          - com.ecommerce.orders.application.exception.ExternalServiceException
+          - org.springframework.web.client.ResourceAccessException
